@@ -22,14 +22,14 @@ from account.conf import settings
 from account.fields import TimeZoneField
 from account.managers import EmailAddressManager, EmailConfirmationManager
 from account.signals import signup_code_sent, signup_code_used
-from account.utils import get_user_model, random_token
+from account.utils import random_token
 
-UserModel = get_user_model()
+AUTH_USER_MODEL = getattr(settings, "AUTH_USER_MODEL", "auth.User")
 
 
 class Account(models.Model):
     
-    user = models.OneToOneField(UserModel, related_name="account", verbose_name=_("user"))
+    user = models.OneToOneField(AUTH_USER_MODEL, related_name="account", verbose_name=_("user"))
     timezone = TimeZoneField(_("timezone"))
     language = models.CharField(_("language"),
         max_length=10,
@@ -88,20 +88,20 @@ class Account(models.Model):
         return value.astimezone(pytz.timezone(timezone))
 
 
-@receiver(post_save, sender=UserModel)
-def user_post_save(sender, **kwargs):
-    """
-    After User.save is called we check to see if it was a created user. If so,
-    we check if the User object wants account creation. If all passes we
-    create an Account object.
-    
-    We only run on user creation to avoid having to check for existence on
-    each call to User.save.
-    """
-    user, created = kwargs["instance"], kwargs["created"]
-    disabled = getattr(user, "_disable_account_creation", not settings.ACCOUNT_CREATE_ON_SAVE)
-    if created and not disabled:
-        Account.create(user=user)
+#@receiver(post_save, sender=UserModel)
+#def user_post_save(sender, **kwargs):
+#    """
+#    After User.save is called we check to see if it was a created user. If so,
+#    we check if the User object wants account creation. If all passes we
+#    create an Account object.
+#
+#    We only run on user creation to avoid having to check for existence on
+#    each call to User.save.
+#    """
+#    user, created = kwargs["instance"], kwargs["created"]
+#    disabled = getattr(user, "_disable_account_creation", not settings.ACCOUNT_CREATE_ON_SAVE)
+#    if created and not disabled:
+#        Account.create(user=user)
 
 
 class AnonymousAccount(object):
@@ -129,7 +129,7 @@ class SignupCode(models.Model):
     code = models.CharField(max_length=64, unique=True)
     max_uses = models.PositiveIntegerField(default=0)
     expiry = models.DateTimeField(null=True, blank=True)
-    inviter = models.ForeignKey(UserModel, null=True, blank=True)
+    inviter = models.ForeignKey(AUTH_USER_MODEL, null=True, blank=True)
     email = models.EmailField(blank=True)
     notes = models.TextField(blank=True)
     sent = models.DateTimeField(null=True, blank=True)
@@ -224,7 +224,7 @@ class SignupCode(models.Model):
 class SignupCodeResult(models.Model):
     
     signup_code = models.ForeignKey(SignupCode)
-    user = models.ForeignKey(UserModel)
+    user = models.ForeignKey(AUTH_USER_MODEL)
     timestamp = models.DateTimeField(default=datetime.datetime.now)
     
     def save(self, **kwargs):
@@ -234,7 +234,7 @@ class SignupCodeResult(models.Model):
 
 class EmailAddress(models.Model):
     
-    user = models.ForeignKey(UserModel)
+    user = models.ForeignKey(AUTH_USER_MODEL)
     email = models.EmailField(unique=settings.ACCOUNT_EMAIL_UNIQUE)
     verified = models.BooleanField(default=False)
     primary = models.BooleanField(default=False)
@@ -343,7 +343,7 @@ class EmailConfirmation(models.Model):
 
 class AccountDeletion(models.Model):
     
-    user = models.ForeignKey(UserModel, null=True, blank=True, on_delete=models.SET_NULL)
+    user = models.ForeignKey(AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
     email = models.EmailField()
     date_requested = models.DateTimeField(default=timezone.now)
     date_expunged = models.DateTimeField(null=True, blank=True)
